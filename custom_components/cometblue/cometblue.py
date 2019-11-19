@@ -37,29 +37,13 @@ _LOGGER.setLevel(10)
 
 
 
-PASSWORD_HANDLE = 0x47
-TEMPERATURE_HANDLE = 0x3f
-STATUS_HANDLE = 0x3d
+PASSWORD_HANDLE = 0x48
+TEMPERATURE_HANDLE = 0x3d
 _TEMPERATURES_STRUCT_PACKING = '<bbbbbbb'
 _PIN_STRUCT_PACKING = '<I'
-_STATUS_STRUCT_PACKING = '<BBB'
 _DATETIME_STRUCT_PACKING = '<BBBBB'
 _BATTERY_STRUCT_PACKING = '<B'
 _DAY_STRUCT_PACKING = '<BBBBBBBB'
-
-_STATUS_BITMASKS = {
-    'childlock': 0x80,
-    'manual_mode': 0x1,
-    'adapting': 0x400,
-    'not_ready': 0x200,
-    'installing': 0x400 | 0x200 | 0x100,
-    'motor_moving': 0x100,
-    'antifrost_activated': 0x10,
-    'satisfied': 0x80000,
-    'low_battery': 0x800
-}
-
-
 
 
 class CometBlue(object):
@@ -73,8 +57,7 @@ class CometBlue(object):
         self._cur_temp = None
         self._temperature = None
         self.available = False
-        self._new_status = dict()
-        self._status = dict()
+        self._manual_mode=False
 #        self.update()
 
     def connect(self):
@@ -86,9 +69,11 @@ class CometBlue(object):
                 self._conn.connect(self._address)
             except Exception as ex2:
                 _LOGGER.debug("Second connection try to %s failed: %s", self._address, ex2)
-                raise
-                
-        self._conn.writeCharacteristic(PASSWORD_HANDLE, struct.pack(_PIN_STRUCT_PACKING, self._pin))
+                raise 
+        try:
+            self._conn.writeCharacteristic(PASSWORD_HANDLE, struct.pack(_PIN_STRUCT_PACKING, self._pin), True)
+        except btle.BTLEException as ex:
+            _LOGGER.error("Writing the pin did not work!")
 
     def disconnect(self):
         
@@ -96,7 +81,7 @@ class CometBlue(object):
         self._conn = btle.Peripheral()
 
     def should_update(self):
-        return self._temperature != None or len(self._new_status)>0
+        return self._temperature != None
 
     @property
     def manual_temperature(self):
@@ -114,30 +99,24 @@ class CometBlue(object):
     
     @property
     def manual_mode(self):
-        if self._status:
-            return self._status['manual_mode']
+        if self._manual_mode:
+            return self._manual_temp
         else:
             return None 
-    
-
-
+ 
     def update(self):
         _LOGGER.debug("Connecting to device %s", self._address)
         self.connect()
+        time.sleep(1)
         try:
             data = self._conn.readCharacteristic(TEMPERATURE_HANDLE)
             self._cur_temp, self._manual_temp, self._target_low, self._target_high, self._offset_temp, \
                     self._window_open_detect, self._window_open_minutes = struct.unpack(
                             _TEMPERATURES_STRUCT_PACKING, data)
-            data = self._conn.readCharacteristic(STATUS_HANDLE)
-            self._status = CometBlue._decode_status(data)
             
             if self._temperature:
                 _LOGGER.debug("Updating Temperature for device %s to %d", self._address, self._temperature)
                 self.write_temperature()
-            if len(self._new_status)>0:
-                _LOGGER.debug("Updating Status for device %s", self._address)
-                self.write_status()            
             self.available = True
             
         except btle.BTLEGattError:
@@ -152,61 +131,13 @@ class CometBlue(object):
     def manual_temperature(self, temperature):
         self._temperature = temperature
     
-    @manual_mode.setter
-    def manual_mode(self, mode):
-        self._new_status['manual_mode'] = mode
-
+    
     def write_temperature(self):
         self._manual_temp = int(self._temperature * 2.0)
         data = struct.pack(
                     _TEMPERATURES_STRUCT_PACKING,
                     -128, self._manual_temp,
                     -128, -128, -128, -128, -128)
-        self._conn.writeCharacteristic(TEMPERATURE_HANDLE,data)
+        self._conn.writeCharacteristic(TEMPERATURE_HANDLE,data, True)
         
         self._temperature = None
-    
-    def write_status(self):
-        status = self._status.copy()
-        status.update(self._new_status)
-        _LOGGER.debug("new status %s", status)
-        
-        data = CometBlue._encode_status(status)
-        self._conn.writeCharacteristic(STATUS_HANDLE,data)
-        self._status = status
-        
-        self._new_status = dict()
-
-    def _decode_status(value):
-        state_bytes = struct.unpack(_STATUS_STRUCT_PACKING, value)
-        state_dword = struct.unpack('<I', value + b'\x00')[0]
-
-        report = {}
-        masked_out = 0
-        for key, mask in _STATUS_BITMASKS.items():
-            report[key] = bool(state_dword & mask == mask)
-            masked_out |= mask
-
-        report['state_as_dword'] = state_dword
-        report['unused_bits'] = state_dword & ~masked_out
-
-        return report
-        
-    
-
-
-    def _encode_status(value):
-        status_dword = 0
-        for key, state in value.items():
-            if not state:
-                continue
-
-            if not key in _STATUS_BITMASKS:
-               # _log.error('Unknown flag ' + key)
-                continue
-
-            status_dword |= _STATUS_BITMASKS[key]
-
-        value = struct.pack('<I', status_dword)
-        # downcast to 3 bytes
-        return struct.pack(_STATUS_STRUCT_PACKING, *[int(byte) for byte in value[:3]])
