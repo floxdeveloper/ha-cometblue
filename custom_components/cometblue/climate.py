@@ -1,6 +1,9 @@
 """
-Home Assistant Support for Eurotronic CometBlue thermostats.
-They are identical to the Sygonix, Xavax Bluetooth thermostats
+Home Assistant Support for German Eurotronic CometBlue thermostats.
+They are identical to the THERMy Blue (Aldi) Bluetooth thermostats.
+
+This is a modified version of neffs ha-cometblue integration. 
+I just adapted the handles for the pin and the temperature.
 
 This version is based on the bluepy library and works on hassio. 
 Currently only current and target temperature in manual mode is supported, nothing else. 
