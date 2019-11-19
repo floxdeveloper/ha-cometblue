@@ -1,8 +1,8 @@
 {
   "domain": "cometblue",
-  "name": "cometblue",
-  "documentation": "https://github.com/neffs/ha-cometblue",
+  "name": "cometblue Germany",
+  "documentation": "https://github.com/floxdeveloper/ha-cometblue",
   "dependencies": [],
-  "codeowners": ["@neffs"],
+  "codeowners": ["@floxdeveloper"],
   "requirements": ["bluepy"]
 }
