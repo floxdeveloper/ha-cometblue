@@ -1,6 +1,9 @@
 
-_Component to integrate with a Eurotronic Comet Blue thermostat._
-They are identical to the Sygonix, Xavax Bluetooth thermostats
+_Component to integrate with a German Eurotronic Comet Blue thermostat._
+They are identical to the THERMy Blue (Aldi) Bluetooth thermostats
+
+This is a modified version of neffs ha-cometblue integration. 
+I just adapted the handles for the pin and the temperature.
 
 This version is based on the bluepy library and works on hass.io. 
 Currently only current and target temperature in manual mode is supported, nothing else. 
@@ -26,4 +29,4 @@ climate cometblue:
 
 ***
 
-[ha-cometblue]: https://github.com/neffs/ha-cometblue
+[ha-cometblue]: https://github.com/floxdeveloper/ha-cometblue
